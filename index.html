@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>云理 · 个人主页</title>
+  <meta name="description" content="高级古风交互主页" />
+  <style>
+    :root{
+      --ink:#0b0f14;
+      --paper:#f7f4ef;
+      --gold:#c5a572;
+      --shadow:0 20px 60px rgba(0,0,0,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;overflow:hidden;color:#222;font-family:ui-serif,Georgia,"Songti SC",STSong,SimSun,serif;background:radial-gradient(1200px 800px at 70% 20%,#ffffff 0%,#f3efe8 60%,#e9e4da 100%);}
+
+    .stage{position:fixed;inset:0;}
+    canvas.bg{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+    .shell{position:relative;z-index:5;display:grid;place-items:center;height:100%;padding:2rem;}
+    .card{position:relative;backdrop-filter:blur(6px)saturate(110%);background:rgba(247,244,239,.82);border:1px solid rgba(197,165,114,.45);box-shadow:var(--shadow);width:min(760px,92vw);min-height:320px;padding:3.2rem 3rem;border-radius:18px;}
+    .card:before,.card:after{content:"";position:absolute;width:64px;height:64px;border:2px solid var(--gold);opacity:.85;}
+    .card:before{left:-10px;top:-10px;border-right:none;border-bottom:none;border-radius:12px 0 0 0;}
+    .card:after{right:-10px;bottom:-10px;border-left:none;border-top:none;border-radius:0 0 12px 0;}
+
+    .titlewrap{display:flex;justify-content:center;margin:0 0 .6rem}
+    svg.title{width:min(680px,86vw);height:auto;overflow:visible}
+    .stroke{fill:url(#goldGrad);stroke:url(#goldGrad);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:900;stroke-dashoffset:900;animation:draw 2.8s ease forwards .3s,glow 4s ease-in-out infinite 3.2s;}
+    @keyframes draw{to{stroke-dashoffset:0}}
+    @keyframes glow{0%,100%{filter:drop-shadow(0 2px 0 rgba(255,255,255,.6))drop-shadow(0 10px 24px rgba(0,0,0,.22));}50%{filter:drop-shadow(0 2px 0 rgba(255,255,255,.9))drop-shadow(0 16px 34px rgba(0,0,0,.28));}}
+
+    .subtitle{margin:.2rem 0 1.6rem;text-align:center;font-size:15px;letter-spacing:.38em;color:#5f5a52;}
+    .divider{height:1px;background:linear-gradient(90deg,rgba(197,165,114,0)0%,rgba(197,165,114,.9)50%,rgba(197,165,114,0)100%);margin:1.2rem auto 1.8rem;width:62%;}
+    .contact{display:flex;gap:1.2rem;justify-content:center;flex-wrap:wrap;}
+    .tag{display:inline-flex;align-items:center;gap:.6rem;padding:.6rem .9rem;border:1px solid rgba(197,165,114,.65);color:#2a2a2a;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(245,241,235,.7));border-radius:999px;transition:transform .25s ease,box-shadow .25s ease;cursor:pointer;text-decoration:none}
+    .tag:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(0,0,0,.12)}
+    .tag svg{width:18px;height:18px;}
+
+    .seal{position:fixed;right:24px;bottom:20px;z-index:6;font-family:"Songti SC",STSong,SimSun,serif;}
+    .chop{display:inline-block;padding:.35rem .5rem;border:2px solid #b22;color:#b22;transform:rotate(-4deg);letter-spacing:.35em;background:rgba(255,255,255,.88);}
+
+    .pond{position:fixed;inset:0;z-index:3;pointer-events:none}
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="ink" class="bg"></canvas>
+    <canvas id="brush" class="bg" style="pointer-events:none"></canvas>
+  </div>
+  
+  <div class="shell">
+    <div class="card">
+      <div class="titlewrap">
+        <svg class="title" viewBox="0 0 800 130">
+          <defs>
+            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#d7b86f"/>
+              <stop offset="50%" stop-color="#fff3c4"/>
+              <stop offset="100%" stop-color="#d7b86f"/>
+            </linearGradient>
+          </defs>
+          <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="64" class="stroke">Yuli Chang</text>
+        </svg>
+      </div>
+      <div class="subtitle">— 只言姓名与联系 —</div>
+      <div class="divider"></div>
+      <div class="contact">
+        <a class="tag" href="mailto:your.name@example.com">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="m22 8-10 6L2 8"/></svg>
+          <span>your.name@example.com</span>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="seal"><span class="chop">云理印</span></div>
+  <script>
+    /* =====================
+       1) WebGL 墨流 + 鼠标水波扰动
+       ===================== */
+    (function(){
+      const canvas = document.getElementById('ink');
+      const gl = canvas.getContext('webgl', {premultipliedAlpha:false, antialias:false});
+      if(!gl){ console.warn('WebGL not supported'); return; }
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+      const vsSrc='attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}';
+      const fsSrc='precision highp float;uniform vec2 R;uniform float T;uniform vec2 M;uniform float C;float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);float a=h(i),b=h(i+vec2(1,0)),c=h(i+vec2(0,1)),d=h(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(a,b,u.x)+(c-a)*u.y*(1.-u.x)+(d-b)*u.x*u.y;}float fbm(vec2 p){float v=0.;float A=.5;for(int i=0;i<5;i++){v+=A*n(p);p=mat2(1.6,1.2,-1.2,1.6)*p+.5;A*=.5;}return v;}void main(){vec2 uv=gl_FragCoord.xy/R;vec2 q=uv*2.-1.;q.x*=R.x/R.y;vec2 d1=vec2(fbm(uv*2.6+T*.06),fbm(uv*2.4-T*.05));vec2 d2=vec2(fbm(uv*4.+d1*1.2+T*.03),fbm(uv*3.2-d1*1.3-T*.02));float ink=fbm(uv*5.+d2*2.2+T*.02);float rip=0.;if(C>0.5){float d=distance(uv,M);rip=0.12*sin(36.*d-T*9.)*exp(-d*9.);}float fibre=n(uv*28.)*0.08;float edge=smoothstep(0.35,0.9,length(q));float shade=smoothstep(0.2,0.95,ink+rip)+fibre-edge*0.12;vec3 paper=vec3(0.972,0.96,0.94);vec3 col=mix(vec3(0.04,0.06,0.08),paper,shade);gl_FragColor=vec4(col,0.95);}';
+      function compile(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));return s;}
+      const vs=compile(gl.VERTEX_SHADER,vsSrc), fs=compile(gl.FRAGMENT_SHADER,fsSrc);
+      const prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);gl.useProgram(prog);
+      const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);const loc=gl.getAttribLocation(prog,'a');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+      const uR=gl.getUniformLocation(prog,'R'),uT=gl.getUniformLocation(prog,'T'),uM=gl.getUniformLocation(prog,'M'),uC=gl.getUniformLocation(prog,'C');
+      function resize(){const w=Math.floor(innerWidth*DPR),h=Math.floor(innerHeight*DPR);canvas.width=w;canvas.height=h;canvas.style.width='100%';canvas.style.height='100%';gl.viewport(0,0,w,h);gl.uniform2f(uR,w,h);}window.addEventListener('resize',resize,{passive:true});resize();
+      let t0=performance.now(),mx=.5,my=.5,clicked=0.;
+      window.addEventListener('mousemove',e=>{mx=e.clientX/innerWidth;my=1.-e.clientY/innerHeight;},{passive:true});
+      window.addEventListener('mousedown',()=>{clicked=1.;setTimeout(()=>clicked=0.,400);});
+      (function loop(){const t=(performance.now()-t0)/1000;gl.uniform1f(uT,t);gl.uniform2f(uM,mx,my);gl.uniform1f(uC,clicked);gl.drawArrays(gl.TRIANGLES,0,3);requestAnimationFrame(loop);})();
+    })();
+
+    /* =====================
+       2) 墨迹追随笔触（Canvas 2D 叠加层）
+       - 鼠标移动即“落墨”
+       - 粘性尾迹 + 缓慢扩散
+       ===================== */
+    (function(){
+      const c = document.getElementById('brush');
+      const ctx = c.getContext('2d');
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+      let W=0,H=0; function resize(){W=c.width=Math.floor(innerWidth*DPR);H=c.height=Math.floor(innerHeight*DPR);c.style.width='100%';c.style.height='100%';}
+      window.addEventListener('resize', resize,{passive:true}); resize();
+
+      let lastX=null,lastY=null,lastT=0; let drawing=false;
+      function splat(x,y,v){
+        const r = Math.max(10, Math.min(60, v*80));
+        const g = ctx.createRadialGradient(x,y, r*0.2, x,y, r);
+        g.addColorStop(0,'rgba(0,0,0,0.35)');
+        g.addColorStop(1,'rgba(0,0,0,0.0)');
+        ctx.globalCompositeOperation='multiply';
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      }
+      function onMove(px,py){
+        const now=performance.now(); const dt=Math.max(16, now-lastT); lastT=now;
+        const x=px*DPR, y=py*DPR;
+        if(lastX==null){ lastX=x; lastY=y; return; }
+        const dx=x-lastX, dy=y-lastY; const dist=Math.hypot(dx,dy)+1e-3; const speed=dist/dt; // px per ms
+        const steps=Math.ceil(dist/8);
+        for(let i=0;i<steps;i++){
+          const t=i/steps; const ix=lastX+dx*t, iy=lastY+dy*t; splat(ix,iy, Math.min(1.2, 0.35+speed*10));
+        }
+        lastX=x; lastY=y; drawing=true;
+      }
+      window.addEventListener('mousemove', e=> onMove(e.clientX, e.clientY), {passive:true});
+      window.addEventListener('touchmove', e=>{ const t=e.touches[0]; if(t) onMove(t.clientX, t.clientY); }, {passive:true});
+
+      // 点击时加重墨溅
+      window.addEventListener('mousedown', e=>{ for(let i=0;i<14;i++){ const a=Math.random()*Math.PI*2; const r= (8+Math.random()*60)*DPR; const px=e.clientX*DPR+Math.cos(a)*r; const py=e.clientY*DPR+Math.sin(a)*r; splat(px,py,1.1); } }, {passive:true});
+
+      // 扩散/蒸发：缓慢淡化尾迹以保留纸张纹理
+      (function fadeLoop(){
+        ctx.globalCompositeOperation='destination-out';
+        ctx.fillStyle='rgba(255,255,255,0.01)'; // 越小越持久
+        ctx.fillRect(0,0,W,H);
+        requestAnimationFrame(fadeLoop);
+      })();
+    })();
+  </script>
+</body>
+</html>
